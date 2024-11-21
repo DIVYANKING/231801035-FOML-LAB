@@ -1,0 +1,82 @@
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import CountVectorizer
+import numpy as np
+
+# Load Dataset
+def load_data():
+    # MovieLens small dataset: https://grouplens.org/datasets/movielens/latest/
+    movies = pd.read_csv("movies.csv")
+    ratings = pd.read_csv("ratings.csv")
+    return movies, ratings
+
+# Merge Datasets
+def preprocess_data(movies, ratings):
+    # Merge datasets
+    movie_ratings = pd.merge(ratings, movies, on="movieId")
+    return movie_ratings
+
+# Build User-Item Matrix
+def create_user_item_matrix(movie_ratings):
+    user_movie_matrix = movie_ratings.pivot_table(
+        index="userId", columns="title", values="rating"
+    )
+    return user_movie_matrix
+
+# Calculate Cosine Similarity
+def calculate_similarity(user_movie_matrix):
+    # Fill missing values with 0 for similarity calculation
+    user_movie_matrix = user_movie_matrix.fillna(0)
+    similarity_matrix = cosine_similarity(user_movie_matrix)
+    return similarity_matrix
+
+# Recommendation Function
+def recommend_movies(user_id, user_movie_matrix, similarity_matrix, top_n=5):
+    user_index = user_id - 1  # Adjust index for zero-based indexing
+    similar_users = similarity_matrix[user_index]
+    similar_users_indices = np.argsort(similar_users)[::-1]  # Sort in descending order
+
+    # Aggregate ratings from similar users
+    similar_users_ratings = user_movie_matrix.iloc[similar_users_indices]
+    avg_ratings = similar_users_ratings.mean(axis=0)
+
+    # Filter out movies the user has already rated
+    rated_movies = user_movie_matrix.iloc[user_index].dropna().index
+    avg_ratings = avg_ratings.drop(rated_movies)
+
+    # Sort recommendations by rating
+    recommendations = avg_ratings.sort_values(ascending=False).head(top_n)
+    return recommendations
+
+# Main Program
+if _name_ == "_main_":
+    # Load data
+    print("Loading data...")
+    movies, ratings = load_data()
+
+    print("Preprocessing data...")
+    movie_ratings = preprocess_data(movies, ratings)
+
+    print("Creating user-item matrix...")
+    user_movie_matrix = create_user_item_matrix(movie_ratings)
+
+    print("Calculating similarity matrix...")
+    similarity_matrix = calculate_similarity(user_movie_matrix)
+
+    print("\nMovie Recommendation System Ready!")
+    while True:
+        print("\nOptions:")
+        print("1. Get movie recommendations")
+        print("2. Exit")
+        choice = input("Enter your choice: ")
+        if choice == "1":
+            user_id = int(input("Enter user ID: "))
+            top_n = int(input("How many recommendations do you want? "))
+            recommendations = recommend_movies(user_id, user_movie_matrix, similarity_matrix, top_n)
+            print("\nRecommended Movies:")
+            print(recommendations)
+        elif choice == "2":
+            print("Exiting... Thank you for using the Movie Recommendation System!")
+            break
+        else:
+            print("Invalid choice")
